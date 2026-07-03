@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>メルカリ出品アシスタント</title>
+<style>
+  :root {
+    --red: #e5352f;
+    --red-dark: #c72b26;
+    --bg: #f7f7f7;
+    --card: #ffffff;
+    --text: #333;
+    --sub: #888;
+    --border: #e0e0e0;
+    --ok: #2e8b57;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+    padding-bottom: 60px;
+  }
+  header {
+    background: var(--red); color: #fff; padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 18px; }
+  header button {
+    background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.5);
+    color: #fff; border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  .card {
+    background: var(--card); border-radius: 12px; padding: 18px;
+    margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  }
+  .card h2 {
+    font-size: 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .step {
+    background: var(--red); color: #fff; width: 22px; height: 22px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; flex-shrink: 0;
+  }
+  label { font-size: 12px; color: var(--sub); display: block; margin: 10px 0 4px; }
+  input[type=text], input[type=number], textarea, select {
+    width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; font-family: inherit; background: #fff;
+  }
+  textarea { resize: vertical; }
+  .counter { text-align: right; font-size: 11px; color: var(--sub); }
+  .counter.over { color: var(--red); font-weight: bold; }
+  .btn {
+    display: inline-block; border: none; border-radius: 8px; padding: 11px 18px;
+    font-size: 14px; cursor: pointer; font-family: inherit; font-weight: 600;
+  }
+  .btn-primary { background: var(--red); color: #fff; }
+  .btn-primary:hover { background: var(--red-dark); }
+  .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+  .btn-sub { background: #fff; color: var(--red); border: 1.5px solid var(--red); }
+  .btn-gray { background: #eee; color: #444; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .mt { margin-top: 12px; }
+
+  /* photo area */
+  #drop {
+    border: 2px dashed var(--border); border-radius: 12px; padding: 26px;
+    text-align: center; color: var(--sub); cursor: pointer; transition: .15s;
+    font-size: 13px;
+  }
+  #drop.drag { border-color: var(--red); background: #fff4f3; color: var(--red); }
+  #thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .thumb { position: relative; width: 92px; height: 92px; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+  .thumb .del {
+    position: absolute; top: -6px; right: -6px; width: 20px; height: 20px;
+    background: #333; color: #fff; border: none; border-radius: 50%;
+    font-size: 11px; cursor: pointer; line-height: 1;
+  }
+  .thumb .badge {
+    position: absolute; bottom: 4px; left: 4px; background: rgba(0,0,0,.6);
+    color: #fff; font-size: 10px; padding: 1px 6px; border-radius: 4px;
+  }
+
+  /* result */
+  #aiStatus { font-size: 13px; margin-top: 10px; }
+  #aiStatus.err { color: var(--red); }
+  #aiStatus.ok { color: var(--ok); }
+  .spinner {
+    display: inline-block; width: 14px; height: 14px; border: 2px solid #ddd;
+    border-top-color: var(--red); border-radius: 50%; vertical-align: -2px;
+    animation: spin .7s linear infinite; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* price research */
+  .pricebox { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .pricebox input { width: 100px; }
+  .stat { background: #fff8f0; border: 1px solid #f3ddc2; border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 13px; }
+  .stat b { font-size: 18px; color: var(--red); }
+  .hint { font-size: 11px; color: var(--sub); margin-top: 6px; }
+  .copied { color: var(--ok); font-size: 12px; margin-left: 6px; }
+
+  /* modal */
+  #modalBg {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 20;
+    align-items: center; justify-content: center; padding: 16px;
+  }
+  #modal { background: #fff; border-radius: 12px; padding: 22px; max-width: 460px; width: 100%; }
+  #modal h3 { font-size: 15px; margin-bottom: 10px; }
+  #modal p { font-size: 12px; color: var(--sub); margin-bottom: 10px; }
+  code { background: #f0f0f0; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛍 メルカリ出品アシスタント</h1>
+  <button onclick="openSettings()">⚙ API設定</button>
+</header>
+
+<main>
+
+  <!-- STEP 1: photos -->
+  <section class="card">
+    <h2><span class="step">1</span>商品写真を追加</h2>
+    <div id="drop">ここに写真をドラッグ＆ドロップ<br>またはクリックして選択（最大10枚・1枚目がメイン写真）</div>
+    <input type="file" id="fileInput" accept="image/*" multiple hidden>
+    <div id="thumbs"></div>
+  </section>
+
+  <!-- STEP 2: info -->
+  <section class="card">
+    <h2><span class="step">2</span>商品情報（わかる範囲でOK）</h2>
+    <label>商品名・キーワード（例：ユニクロ ダウンジャケット メンズ L）</label>
+    <input type="text" id="keyword" placeholder="ブランド名＋商品種類＋サイズ/型番など">
+    <label>気になる点・補足（傷、購入時期、付属品など）</label>
+    <input type="text" id="memo" placeholder="例：袖に小さなほつれあり。2023年購入、箱つき">
+  </section>
+
+  <!-- STEP 3: AI analysis -->
+  <section class="card">
+    <h2><span class="step">3</span>AIで写真から分析</h2>
+    <div class="row">
+      <button class="btn btn-primary" id="analyzeBtn" onclick="analyze()">写真を分析して下書き生成</button>
+      <button class="btn btn-sub" onclick="copyPrompt()">分析用プロンプトをコピー</button>
+      <span id="promptCopied"></span>
+    </div>
+    <div class="hint">「写真を分析」はAPIキー設定が必要（右上⚙）。キーが無い場合は「プロンプトをコピー」して、Claudeアプリに写真と一緒に貼り付けても同じ結果が得られます。</div>
+    <div id="aiStatus"></div>
+  </section>
+
+  <!-- STEP 4: price research -->
+  <section class="card">
+    <h2><span class="step">4</span>売れた価格を調べる（実売価格を優先）</h2>
+    <div class="row">
+      <button class="btn btn-sub btn-sm" onclick="openMercari('sold_out')">メルカリ：売り切れ（実際に売れた価格）</button>
+      <button class="btn btn-gray btn-sm" onclick="openMercari('on_sale')">メルカリ：販売中（競合の値付け）</button>
+    </div>
+    <div class="hint">開いたページで「自分の商品と状態が近いもの」の売れた価格を3〜5件メモして、下に入力してください。</div>
+    <label>売れた価格を入力（円）</label>
+    <div class="pricebox">
+      <input type="number" class="soldPrice" placeholder="例 2400">
+      <input type="number" class="soldPrice" placeholder="例 2200">
+      <input type="number" class="soldPrice" placeholder="例 2800">
+      <input type="number" class="soldPrice" placeholder="">
+      <input type="number" class="soldPrice" placeholder="">
+    </div>
+    <div class="row mt">
+      <div style="flex:1; min-width:140px;">
+        <label>送料（自分負担分・円）</label>
+        <input type="number" id="shipping" value="210" title="ネコポス210円/ゆうパケット230円/宅急便コンパクト450円+箱70円 など">
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="calcPrice()" style="margin-top:18px;">相場から価格を計算</button>
+    </div>
+    <div id="priceResult"></div>
+  </section>
+
+  <!-- STEP 5: draft -->
+  <section class="card">
+    <h2><span class="step">5</span>出品下書き（メルカリに貼り付け）</h2>
+    <label>商品名（40文字まで）</label>
+    <input type="text" id="title" maxlength="60" oninput="count('title',40)">
+    <div class="counter" id="title-count">0 / 40</div>
+    <label>商品の説明（1000文字まで）</label>
+    <textarea id="desc" rows="12" oninput="count('desc',1000)"></textarea>
+    <div class="counter" id="desc-count">0 / 1000</div>
+    <div class="row mt">
+      <div style="min-width:130px;">
+        <label>商品の状態</label>
+        <select id="condition">
+          <option>新品、未使用</option>
+          <option>未使用に近い</option>
+          <option>目立った傷や汚れなし</option>
+          <option selected>やや傷や汚れあり</option>
+          <option>傷や汚れあり</option>
+          <option>全体的に状態が悪い</option>
+        </select>
+      </div>
+      <div style="min-width:130px;">
+        <label>販売価格（円）</label>
+        <input type="number" id="price" min="300" max="9999999">
+      </div>
+    </div>
+    <div class="row mt">
+      <button class="btn btn-primary" onclick="copyField('title', this)">商品名をコピー</button>
+      <button class="btn btn-primary" onclick="copyField('desc', this)">説明文をコピー</button>
+    </div>
+    <div class="hint">メルカリアプリで「出品」→ 写真を追加 → 貼り付け → 最後に「下書きに保存」を押せば下書き完成です。</div>
+  </section>
+
+</main>
+
+<!-- settings modal -->
+<div id="modalBg" onclick="if(event.target===this) closeSettings()">
+  <div id="modal">
+    <h3>Claude API 設定（任意）</h3>
+    <p>APIキーを設定すると「写真を分析」ボタンでAIが直接、状態判定・タイトル・説明文を生成します。キーは端末内（localStorage）のみに保存されます。<br>
+    取得先：<code>console.anthropic.com</code> → API Keys</p>
+    <label>APIキー（sk-ant-...）</label>
+    <input type="text" id="apiKeyInput" placeholder="sk-ant-api03-...">
+    <div class="row mt">
+      <button class="btn btn-primary btn-sm" onclick="saveKey()">保存</button>
+      <button class="btn btn-gray btn-sm" onclick="clearKey()">削除</button>
+      <button class="btn btn-gray btn-sm" onclick="closeSettings()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ photos ============ */
+const photos = []; // {dataUrl, mediaType, b64}
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+
+drop.onclick = () => fileInput.click();
+fileInput.onchange = e => addFiles(e.target.files);
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('drag'); };
+drop.ondragleave = () => drop.classList.remove('drag');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('drag'); addFiles(e.dataTransfer.files); };
+
+async function addFiles(files) {
+  for (const f of files) {
+    if (!f.type.startsWith('image/')) continue;
+    if (photos.length >= 10) { alert('写真は最大10枚です'); break; }
+    const resized = await resizeImage(f, 1200, 0.82);
+    photos.push(resized);
+  }
+  renderThumbs();
+}
+
+function resizeImage(file, maxSide, quality) {
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const dataUrl = c.toDataURL('image/jpeg', quality);
+      res({ dataUrl, mediaType: 'image/jpeg', b64: dataUrl.split(',')[1] });
+      URL.revokeObjectURL(img.src);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function renderThumbs() {
+  const t = document.getElementById('thumbs');
+  t.innerHTML = '';
+  photos.forEach((p, i) => {
+    const d = document.createElement('div');
+    d.className = 'thumb';
+    d.innerHTML = `<img src="${p.dataUrl}">
+      ${i === 0 ? '<span class="badge">メイン</span>' : ''}
+      <button class="del" onclick="photos.splice(${i},1);renderThumbs()">×</button>`;
+    t.appendChild(d);
+  });
+}
+
+/* ============ AI analysis ============ */
+const SCHEMA = {
+  type: "object",
+  properties: {
+    title: { type: "string", description: "メルカリの商品名。40文字以内。検索されやすいキーワードを詰める" },
+    description: { type: "string", description: "メルカリの商品説明。1000文字以内。実際に売れている出品の書き方（冒頭あいさつ→商品情報→状態→発送）に倣う" },
+    condition: { type: "string", enum: ["新品、未使用","未使用に近い","目立った傷や汚れなし","やや傷や汚れあり","傷や汚れあり","全体的に状態が悪い"], description: "写真から判定した商品の状態" },
+    condition_notes: { type: "string", description: "写真から確認できた傷・汚れ・使用感の具体的な指摘" },
+    search_keywords: { type: "array", items: { type: "string" }, description: "相場調査用の検索キーワード候補 2〜3個" },
+    category_hint: { type: "string", description: "メルカリでのカテゴリの推測" },
+    price_hint: { type: "string", description: "一般的な相場観のヒント（あくまで参考。実売データを優先するよう注記）" }
+  },
+  required: ["title","description","condition","condition_notes","search_keywords","category_hint","price_hint"],
+  additionalProperties: false
+};
+
+function buildInstruction() {
+  const kw = document.getElementById('keyword').value.trim();
+  const memo = document.getElementById('memo').value.trim();
+  return `あなたはメルカリ出品のプロです。添付の商品写真をよく観察して、出品情報を作成してください。
+
+【ユーザーからの情報】
+・商品名/キーワード: ${kw || '（未入力。写真から推測してください）'}
+・補足メモ: ${memo || 'なし'}
+
+【作成ルール】
+1. 写真から商品の状態（傷・汚れ・使用感・毛玉・色あせ・付属品）を具体的に観察して判定する
+2. 商品名は40文字以内。ブランド名・商品種類・サイズ・色など検索されやすい語を優先
+3. 説明文は1000文字以内。実際に売れている出品文の定番構成に従う:
+   ご覧いただきありがとうございます → 商品情報(ブランド/サイズ/色/素材) → 状態(正直に・写真参照を促す) → 発送(匿名配送・目安日数) → ハッシュタグ2〜3個
+4. 状態に不明点があれば「写真でご確認ください」と誠実に書く（クレーム防止）
+5. 価格は決めつけず、相場調査用の検索キーワードを提案する`;
+}
+
+async function analyze() {
+  const key = localStorage.getItem('anthropicKey');
+  const status = document.getElementById('aiStatus');
+  if (!photos.length) { status.className = 'err'; status.textContent = '先に写真を追加してください'; return; }
+  if (!key) { status.className = 'err'; status.textContent = 'APIキーが未設定です。右上の⚙から設定するか、「プロンプトをコピー」を使ってください'; openSettings(); return; }
+
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  status.className = '';
+  status.innerHTML = '<span class="spinner"></span>写真を分析中…（10〜30秒ほどかかります）';
+
+  const content = photos.map(p => ({
+    type: 'image',
+    source: { type: 'base64', media_type: p.mediaType, data: p.b64 }
+  }));
+  content.push({ type: 'text', text: buildInstruction() });
+
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-8',
+        max_tokens: 4096,
+        output_config: { format: { type: 'json_schema', schema: SCHEMA } },
+        messages: [{ role: 'user', content }]
+      })
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.error?.message || `HTTP ${r.status}`);
+    }
+    const data = await r.json();
+    const text = data.content.find(b => b.type === 'text')?.text;
+    applyResult(JSON.parse(text));
+    status.className = 'ok';
+    status.textContent = '✅ 分析完了！ステップ4で実売価格を調べて、ステップ5の下書きを確認してください';
+  } catch (e) {
+    status.className = 'err';
+    status.textContent = '分析に失敗しました: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function applyResult(r) {
+  document.getElementById('title').value = r.title || '';
+  count('title', 40);
+  document.getElementById('desc').value = r.description || '';
+  count('desc', 1000);
+  const sel = document.getElementById('condition');
+  if (r.condition) sel.value = r.condition;
+  if (r.search_keywords?.length && !document.getElementById('keyword').value.trim()) {
+    document.getElementById('keyword').value = r.search_keywords[0];
+  }
+  // append analysis info to status area
+  const status = document.getElementById('aiStatus');
+  const extra = document.createElement('div');
+  extra.className = 'stat';
+  extra.innerHTML = `<b style="font-size:13px">📋 AIの状態判定</b><br>${esc(r.condition_notes || '')}
+    <br><span style="color:#888">カテゴリ目安: ${esc(r.category_hint || '-')} ／ 相場ヒント: ${esc(r.price_hint || '-')}</span>
+    <br><span style="color:#888">検索キーワード候補: ${(r.search_keywords || []).map(esc).join(' / ')}</span>`;
+  status.insertAdjacentElement('afterend', extra);
+}
+
+function copyPrompt() {
+  const p = buildInstruction() + `
+
+【出力形式】
+以下の項目で出力してください:
+・商品名（40文字以内）
+・商品の状態（新品、未使用/未使用に近い/目立った傷や汚れなし/やや傷や汚れあり/傷や汚れあり/全体的に状態が悪い のいずれか）
+・状態の根拠（写真から見えたこと）
+・説明文（1000文字以内）
+・相場調査用の検索キーワード 2〜3個
+
+※このプロンプトと一緒に商品の写真を添付してください`;
+  navigator.clipboard.writeText(p).then(() => {
+    const el = document.getElementById('promptCopied');
+    el.className = 'copied'; el.textContent = '✅ コピーしました。Claudeに写真と一緒に貼り付けてください';
+    setTimeout(() => el.textContent = '', 5000);
+  });
+}
+
+/* ============ price research ============ */
+function openMercari(status) {
+  const kw = document.getElementById('keyword').value.trim() || document.getElementById('title').value.trim();
+  if (!kw) { alert('ステップ2にキーワードを入力してください'); return; }
+  const url = `https://jp.mercari.com/search?keyword=${encodeURIComponent(kw)}&status=${status}&sort=created_time&order=desc`;
+  window.open(url, '_blank');
+}
+
+function calcPrice() {
+  const prices = [...document.querySelectorAll('.soldPrice')]
+    .map(i => parseInt(i.value)).filter(v => v > 0).sort((a, b) => a - b);
+  const out = document.getElementById('priceResult');
+  if (prices.length < 2) { out.innerHTML = '<div class="stat">売れた価格を2件以上入力してください</div>'; return; }
+  const mid = prices.length % 2
+    ? prices[(prices.length - 1) / 2]
+    : Math.round((prices[prices.length / 2 - 1] + prices[prices.length / 2]) / 2);
+  const suggested = Math.max(300, Math.round(mid / 10) * 10);
+  const ship = parseInt(document.getElementById('shipping').value) || 0;
+  const net = Math.floor(suggested * 0.9) - ship;
+  document.getElementById('price').value = suggested;
+  out.innerHTML = `<div class="stat">
+    実売中央値から提案価格: <b>${suggested.toLocaleString()}円</b><br>
+    手数料10%（-${Math.ceil(suggested*0.1).toLocaleString()}円）＋ 送料（-${ship.toLocaleString()}円）＝ 手取り <b>${net.toLocaleString()}円</b>
+    <div class="hint">早く売りたい→中央値より1割安め ／ 急がない→中央値のまま＋値下げ交渉の余地。ステップ5の価格欄に自動入力しました。</div>
+  </div>`;
+}
+
+/* ============ draft ============ */
+function count(id, max) {
+  const v = document.getElementById(id).value.length;
+  const c = document.getElementById(id + '-count');
+  c.textContent = `${v} / ${max}`;
+  c.className = 'counter' + (v > max ? ' over' : '');
+}
+
+function copyField(id, btn) {
+  navigator.clipboard.writeText(document.getElementById(id).value).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✅ コピーしました';
+    setTimeout(() => btn.textContent = orig, 1800);
+  });
+}
+
+/* ============ settings ============ */
+function openSettings() {
+  document.getElementById('apiKeyInput').value = localStorage.getItem('anthropicKey') || '';
+  document.getElementById('modalBg').style.display = 'flex';
+}
+function closeSettings() { document.getElementById('modalBg').style.display = 'none'; }
+function saveKey() {
+  const v = document.getElementById('apiKeyInput').value.trim();
+  if (v) localStorage.setItem('anthropicKey', v);
+  closeSettings();
+}
+function clearKey() {
+  localStorage.removeItem('anthropicKey');
+  document.getElementById('apiKeyInput').value = '';
+}
+
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+</body>
+</html>
